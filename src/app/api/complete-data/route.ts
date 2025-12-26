@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verificação de segurança
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get('secret');
     
@@ -13,166 +12,223 @@ export async function POST(request: NextRequest) {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
-    console.log('🚀 Inserindo peças e vendas no PostgreSQL Railway...');
+    console.log('🚀 Inserindo dados completos...');
 
-    // 1. Buscar IDs das categorias e fornecedores
+    // Buscar categorias e fornecedores existentes
     const categories = await prisma.category.findMany();
     const suppliers = await prisma.supplier.findMany();
-    const users = await prisma.user.findMany();
-
+    
     if (categories.length === 0 || suppliers.length === 0) {
       return NextResponse.json({
         error: 'Execute primeiro o endpoint insert-data para criar categorias e fornecedores'
       }, { status: 400 });
     }
 
-    // Mapear por nome para facilitar
-    const categoriaMotor = categories.find(c => c.name === 'Motor')?.id;
-    const categoriaFreios = categories.find(c => c.name === 'Freios')?.id;
-    const categoriaSuspensao = categories.find(c => c.name === 'Suspensão')?.id;
-    const categoriaEletrica = categories.find(c => c.name === 'Elétrica')?.id;
-    const categoriaCarroceria = categories.find(c => c.name === 'Carroceria')?.id;
+    // Inserir peças usando Prisma create (mais seguro)
+    const parts = await Promise.all([
+      prisma.part.create({
+        data: {
+          code: 'PC001001',
+          name: 'Filtro de Óleo',
+          description: 'Filtro de óleo para motores 1.0 a 2.0',
+          brand: 'Mann Filter',
+          model: 'W712/75',
+          price: 25.90,
+          costPrice: 18.50,
+          stock: 50,
+          minStock: 10,
+          location: 'A1-01',
+          categoryId: categories[0].id,
+          supplierId: suppliers[0].id,
+          warranty: 12
+        }
+      }),
+      prisma.part.create({
+        data: {
+          code: 'PC001002',
+          name: 'Vela de Ignição',
+          description: 'Vela de ignição iridium',
+          brand: 'NGK',
+          model: 'BKR6EIX',
+          price: 45.00,
+          costPrice: 32.00,
+          stock: 30,
+          minStock: 5,
+          location: 'A1-02',
+          categoryId: categories[0].id,
+          supplierId: suppliers[1].id,
+          warranty: 24
+        }
+      }),
+      prisma.part.create({
+        data: {
+          code: 'PC002001',
+          name: 'Amortecedor Dianteiro',
+          description: 'Amortecedor dianteiro direito',
+          brand: 'Monroe',
+          model: 'G8005',
+          price: 180.00,
+          costPrice: 125.00,
+          stock: 20,
+          minStock: 3,
+          location: 'B2-01',
+          categoryId: categories[1].id,
+          supplierId: suppliers[2].id,
+          warranty: 12
+        }
+      }),
+      prisma.part.create({
+        data: {
+          code: 'PC003001',
+          name: 'Pastilha de Freio',
+          description: 'Pastilha de freio dianteira',
+          brand: 'Bosch',
+          model: 'BP1234',
+          price: 85.00,
+          costPrice: 58.00,
+          stock: 40,
+          minStock: 8,
+          location: 'C1-01',
+          categoryId: categories[1].id,
+          supplierId: suppliers[0].id,
+          warranty: 12
+        }
+      }),
+      prisma.part.create({
+        data: {
+          code: 'PC004001',
+          name: 'Bateria 60Ah',
+          description: 'Bateria automotiva 60Ah',
+          brand: 'Moura',
+          model: 'M60GD',
+          price: 280.00,
+          costPrice: 195.00,
+          stock: 18,
+          minStock: 3,
+          location: 'E1-01',
+          categoryId: categories[2].id,
+          supplierId: suppliers[1].id,
+          warranty: 18
+        }
+      })
+    ]);
+
+    console.log('✅ Peças criadas');
+
+    // Buscar usuários para vendas
+    const vendedor = await prisma.user.findUnique({
+      where: { email: 'vendedor@autopecas.com' }
+    });
     
-    const fornecedor1 = suppliers[0]?.id;
-    const fornecedor2 = suppliers[1]?.id;
-    const fornecedor3 = suppliers[2]?.id;
+    const admin = await prisma.user.findUnique({
+      where: { email: 'admin@autopecas.com' }
+    });
 
-    const adminUser = users.find(u => u.role === 'ADMIN')?.id;
-    const vendedorUser = users.find(u => u.role === 'USER')?.id;
+    let salesCount = 0;
 
-    // 2. Inserir peças usando SQL direto
-    const partsData = [
-      // Motor
-      { code: 'PC001001', name: 'Filtro de Óleo', brand: 'Mann Filter', model: 'W712/75', price: 25.90, cost: 18.50, stock: 50, minStock: 10, category: categoriaMotor, supplier: fornecedor1 },
-      { code: 'PC001002', name: 'Vela de Ignição', brand: 'NGK', model: 'BKR6EIX', price: 45.00, cost: 32.00, stock: 30, minStock: 5, category: categoriaMotor, supplier: fornecedor2 },
-      { code: 'PC001003', name: 'Correia Dentada', brand: 'Gates', model: 'GT5405', price: 85.00, cost: 58.00, stock: 25, minStock: 4, category: categoriaMotor, supplier: fornecedor1 },
-      
-      // Freios
-      { code: 'PC002001', name: 'Pastilha de Freio', brand: 'Bosch', model: 'BP1234', price: 85.00, cost: 58.00, stock: 40, minStock: 8, category: categoriaFreios, supplier: fornecedor1 },
-      { code: 'PC002002', name: 'Disco de Freio', brand: 'Brembo', model: 'BD7890', price: 150.00, cost: 105.00, stock: 25, minStock: 4, category: categoriaFreios, supplier: fornecedor2 },
-      { code: 'PC002003', name: 'Fluido de Freio', brand: 'Castrol', model: 'DOT4', price: 35.00, cost: 24.00, stock: 60, minStock: 12, category: categoriaFreios, supplier: fornecedor3 },
-      
-      // Suspensão
-      { code: 'PC003001', name: 'Amortecedor Dianteiro', brand: 'Monroe', model: 'G8005', price: 180.00, cost: 125.00, stock: 20, minStock: 3, category: categoriaSuspensao, supplier: fornecedor2 },
-      { code: 'PC003002', name: 'Mola Helicoidal', brand: 'Eibach', model: 'E10-85-016', price: 120.00, cost: 85.00, stock: 15, minStock: 2, category: categoriaSuspensao, supplier: fornecedor3 },
-      
-      // Elétrica
-      { code: 'PC004001', name: 'Bateria 60Ah', brand: 'Moura', model: 'M60GD', price: 280.00, cost: 195.00, stock: 18, minStock: 3, category: categoriaEletrica, supplier: fornecedor1 },
-      { code: 'PC004002', name: 'Alternador', brand: 'Bosch', model: 'ALT9090', price: 450.00, cost: 315.00, stock: 12, minStock: 2, category: categoriaEletrica, supplier: fornecedor2 },
-      
-      // Carroceria
-      { code: 'PC005001', name: 'Retrovisor Externo', brand: 'Metagal', model: 'MT123456', price: 95.00, cost: 68.00, stock: 22, minStock: 4, category: categoriaCarroceria, supplier: fornecedor3 },
-      { code: 'PC005002', name: 'Farol Dianteiro', brand: 'Arteb', model: 'AR5555', price: 220.00, cost: 154.00, stock: 16, minStock: 3, category: categoriaCarroceria, supplier: fornecedor1 }
-    ];
+    if (vendedor && parts.length >= 3) {
+      // Criar venda 1
+      const sale1 = await prisma.sale.create({
+        data: {
+          customerName: 'Carlos Cliente',
+          customerEmail: 'carlos@email.com',
+          customerPhone: '(11) 99999-1234',
+          userId: vendedor.id,
+          totalAmount: 155.90,
+          status: 'CONFIRMED',
+          paymentMethod: 'PIX'
+        }
+      });
 
-    // Criar peças
-    const partIds = [];
-    for (const part of partsData) {
-      const result = await prisma.$queryRaw<{id: string}[]>`
-        INSERT INTO parts (id, code, name, brand, model, price, "costPrice", stock, "minStock", "categoryId", "supplierId", "createdAt", "updatedAt") 
-        VALUES (gen_random_uuid(), ${part.code}, ${part.name}, ${part.brand}, ${part.model}, ${part.price}, ${part.cost}, ${part.stock}, ${part.minStock}, ${part.category}, ${part.supplier}, NOW(), NOW())
-        ON CONFLICT (code) DO NOTHING
-        RETURNING id;
-      `;
-      if (result.length > 0) {
-        partIds.push(result[0].id);
-        
-        // Criar movimentação de estoque inicial
-        await prisma.$executeRaw`
-          INSERT INTO stock_movements (id, "partId", type, quantity, reason, "createdAt", "updatedAt") 
-          VALUES (gen_random_uuid(), ${result[0].id}, 'IN', ${part.stock}, 'Estoque inicial', NOW(), NOW());
-        `;
-      }
+      // Itens da venda 1
+      await Promise.all([
+        prisma.saleItem.create({
+          data: {
+            saleId: sale1.id,
+            partId: parts[0].id,
+            quantity: 2,
+            unitPrice: 25.90,
+            totalPrice: 51.80
+          }
+        }),
+        prisma.saleItem.create({
+          data: {
+            saleId: sale1.id,
+            partId: parts[3].id,
+            quantity: 1,
+            unitPrice: 85.00,
+            totalPrice: 85.00
+          }
+        })
+      ]);
+
+      salesCount++;
     }
 
-    console.log('✅ Peças inseridas');
-
-    // 3. Criar algumas vendas de exemplo
-    if (adminUser && vendedorUser && partIds.length > 0) {
-      // Buscar algumas peças criadas
-      const createdParts = await prisma.part.findMany({ take: 6 });
-      
-      if (createdParts.length >= 3) {
-        // Venda 1
-        const sale1Result = await prisma.$queryRaw<{id: string}[]>`
-          INSERT INTO sales (id, "customerName", "customerEmail", "customerPhone", "userId", "totalAmount", status, "paymentMethod", "createdAt", "updatedAt") 
-          VALUES (gen_random_uuid(), 'Carlos Cliente', 'carlos@email.com', '(11) 99999-1234', ${vendedorUser}, 155.90, 'CONFIRMED', 'PIX', NOW(), NOW())
-          RETURNING id;
-        `;
-        
-        if (sale1Result.length > 0) {
-          const sale1Id = sale1Result[0].id;
-          
-          // Itens da venda 1
-          await prisma.$executeRaw`
-            INSERT INTO sale_items (id, "saleId", "partId", quantity, "unitPrice", "totalPrice", "createdAt", "updatedAt") 
-            VALUES 
-              (gen_random_uuid(), ${sale1Id}, ${createdParts[0].id}, 2, ${createdParts[0].price}, ${createdParts[0].price * 2}, NOW(), NOW()),
-              (gen_random_uuid(), ${sale1Id}, ${createdParts[1].id}, 1, ${createdParts[1].price}, ${createdParts[1].price}, NOW(), NOW());
-          `;
-          
-          // Atualizar estoque
-          await prisma.$executeRaw`
-            UPDATE parts SET stock = stock - 2 WHERE id = ${createdParts[0].id};
-          `;
-          await prisma.$executeRaw`
-            UPDATE parts SET stock = stock - 1 WHERE id = ${createdParts[1].id};
-          `;
+    if (admin && parts.length >= 3) {
+      // Criar venda 2
+      const sale2 = await prisma.sale.create({
+        data: {
+          customerName: 'Maria Motorista',
+          customerEmail: 'maria@email.com',
+          customerPhone: '(11) 88888-5678',
+          userId: admin.id,
+          totalAmount: 460.00,
+          status: 'DELIVERED',
+          paymentMethod: 'CREDIT_CARD'
         }
+      });
 
-        // Venda 2
-        const sale2Result = await prisma.$queryRaw<{id: string}[]>`
-          INSERT INTO sales (id, "customerName", "customerEmail", "customerPhone", "userId", "totalAmount", status, "paymentMethod", "createdAt", "updatedAt") 
-          VALUES (gen_random_uuid(), 'Maria Motorista', 'maria@email.com', '(11) 88888-5678', ${adminUser}, 330.00, 'DELIVERED', 'CREDIT_CARD', NOW(), NOW())
-          RETURNING id;
-        `;
-        
-        if (sale2Result.length > 0) {
-          const sale2Id = sale2Result[0].id;
-          
-          // Itens da venda 2
-          await prisma.$executeRaw`
-            INSERT INTO sale_items (id, "saleId", "partId", quantity, "unitPrice", "totalPrice", "createdAt", "updatedAt") 
-            VALUES 
-              (gen_random_uuid(), ${sale2Id}, ${createdParts[2].id}, 1, ${createdParts[2].price}, ${createdParts[2].price}, NOW(), NOW()),
-              (gen_random_uuid(), ${sale2Id}, ${createdParts[3].id}, 1, ${createdParts[3].price}, ${createdParts[3].price}, NOW(), NOW());
-          `;
-          
-          // Atualizar estoque
-          await prisma.$executeRaw`
-            UPDATE parts SET stock = stock - 1 WHERE id = ${createdParts[2].id};
-          `;
-          await prisma.$executeRaw`
-            UPDATE parts SET stock = stock - 1 WHERE id = ${createdParts[3].id};
-          `;
-        }
-      }
+      // Itens da venda 2
+      await Promise.all([
+        prisma.saleItem.create({
+          data: {
+            saleId: sale2.id,
+            partId: parts[2].id,
+            quantity: 1,
+            unitPrice: 180.00,
+            totalPrice: 180.00
+          }
+        }),
+        prisma.saleItem.create({
+          data: {
+            saleId: sale2.id,
+            partId: parts[4].id,
+            quantity: 1,
+            unitPrice: 280.00,
+            totalPrice: 280.00
+          }
+        })
+      ]);
+
+      salesCount++;
     }
 
-    console.log('✅ Vendas de exemplo criadas');
+    console.log('✅ Vendas criadas');
 
-    // 4. Contar dados finais
-    const partsCount = await prisma.part.count();
-    const salesCount = await prisma.sale.count();
-    const stockMovementsCount = await prisma.stockMovement.count();
+    // Criar movimentações de estoque
+    for (const part of parts) {
+      await prisma.stockMovement.create({
+        data: {
+          partId: part.id,
+          type: 'IN',
+          quantity: part.stock,
+          reason: 'Estoque inicial'
+        }
+      });
+    }
+
+    console.log('✅ Movimentações de estoque criadas');
 
     await prisma.$disconnect();
 
     return NextResponse.json({
       success: true,
-      message: 'Sistema completo populado com sucesso!',
+      message: 'Dados completos inseridos com sucesso!',
       data: {
-        categories: categories.length,
-        suppliers: suppliers.length,
-        parts: partsCount,
+        parts: parts.length,
         sales: salesCount,
-        stockMovements: stockMovementsCount,
-        users: users.length
-      },
-      summary: {
-        partsCreated: partIds.length,
-        salesCreated: 2,
-        stockMovements: 'Criadas automaticamente'
+        stockMovements: parts.length
       }
     });
 
