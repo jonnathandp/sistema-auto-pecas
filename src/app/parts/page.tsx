@@ -49,7 +49,6 @@ export default function PartsPage() {
     lowStock: false
   })
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     description: '',
     brand: '',
@@ -142,7 +141,6 @@ export default function PartsPage() {
   const handleEdit = (part: Part) => {
     setEditingPart(part)
     setFormData({
-      code: part.code,
       name: part.name,
       description: '',
       brand: part.brand || '',
@@ -181,7 +179,6 @@ export default function PartsPage() {
 
   const resetForm = () => {
     setFormData({
-      code: '',
       name: '',
       description: '',
       brand: '',
@@ -364,14 +361,6 @@ export default function PartsPage() {
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Código"
-                name="code"
-                value={formData.code}
-                onChange={handleChange}
-                required
-                error={formErrors.code}
-              />
               <Input
                 label="Nome"
                 name="name"

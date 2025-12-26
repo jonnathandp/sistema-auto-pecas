@@ -95,21 +95,23 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json()
 
-    // Check if code already exists
-    const existingPart = await prisma.part.findUnique({
-      where: { code: data.code }
-    })
+    // Generate automatic code based on timestamp and random number
+    const timestamp = Date.now().toString().slice(-6)
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    const autoCode = `PC${timestamp}${random}`
 
-    if (existingPart) {
-      return NextResponse.json(
-        { error: 'Código da peça já existe' },
-        { status: 409 }
-      )
+    // Check if auto-generated code already exists (very unlikely)
+    let finalCode = autoCode
+    let counter = 1
+    while (await prisma.part.findUnique({ where: { code: finalCode } })) {
+      finalCode = `${autoCode}${counter}`
+      counter++
     }
 
     const part = await prisma.part.create({
       data: {
         ...data,
+        code: finalCode,
         price: parseFloat(data.price),
         costPrice: data.costPrice ? parseFloat(data.costPrice) : null,
         weight: data.weight ? parseFloat(data.weight) : null

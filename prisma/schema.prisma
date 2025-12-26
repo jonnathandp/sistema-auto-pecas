@@ -57,7 +57,7 @@ model Supplier {
 
 model Part {
   id           String   @id @default(cuid())
-  code         String   @unique
+  code         String   @unique @default("")
   name         String
   description  String?
   brand        String?
