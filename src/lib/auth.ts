@@ -8,7 +8,11 @@ import { PrismaClient } from '@prisma/client'
 import type { NextAuthOptions } from 'next-auth'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
-const prisma = new PrismaClient()
+
+// Função para criar Prisma client de forma lazy
+function createPrismaClient() {
+  return new PrismaClient()
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
@@ -31,7 +35,7 @@ export function verifyToken(token: string): { userId: string } | null {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: process.env.DATABASE_URL ? PrismaAdapter(createPrismaClient()) : undefined,
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -44,7 +48,14 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Só tentar conectar ao banco se DATABASE_URL estiver disponível
+        if (!process.env.DATABASE_URL) {
+          console.warn('DATABASE_URL not available during build')
+          return null
+        }
+
         try {
+          const prisma = createPrismaClient()
           const user = await prisma.user.findUnique({
             where: {
               email: credentials.email
@@ -52,6 +63,7 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user) {
+            await prisma.$disconnect()
             return null
           }
 
@@ -61,9 +73,11 @@ export const authOptions: NextAuthOptions = {
           )
 
           if (!isPasswordValid) {
+            await prisma.$disconnect()
             return null
           }
 
+          await prisma.$disconnect()
           return {
             id: user.id,
             email: user.email,
