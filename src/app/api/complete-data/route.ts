@@ -130,11 +130,12 @@ export async function POST(request: NextRequest) {
       // Criar venda 1
       const sale1 = await prisma.sale.create({
         data: {
+          saleNumber: 'SALE-001',
           customerName: 'Carlos Cliente',
           customerEmail: 'carlos@email.com',
           customerPhone: '(11) 99999-1234',
           userId: vendedor.id,
-          totalAmount: 155.90,
+          total: 155.90,
           status: 'CONFIRMED',
           paymentMethod: 'PIX'
         }
@@ -169,11 +170,12 @@ export async function POST(request: NextRequest) {
       // Criar venda 2
       const sale2 = await prisma.sale.create({
         data: {
+          saleNumber: 'SALE-002',
           customerName: 'Maria Motorista',
           customerEmail: 'maria@email.com',
           customerPhone: '(11) 88888-5678',
           userId: admin.id,
-          totalAmount: 460.00,
+          total: 460.00,
           status: 'DELIVERED',
           paymentMethod: 'CREDIT_CARD'
         }
