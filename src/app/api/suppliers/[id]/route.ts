@@ -2,6 +2,85 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromToken } from '@/lib/auth'
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const token = request.cookies.get('auth-token')?.value
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Token de autenticação necessário' },
+        { status: 401 }
+      )
+    }
+
+    const user = await getUserFromToken(token)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Token inválido' },
+        { status: 401 }
+      )
+    }
+
+    const data = await request.json()
+
+    // Verificar se já existe outro fornecedor com o mesmo CNPJ (se fornecido)
+    if (data.cnpj) {
+      const existingSupplier = await prisma.supplier.findFirst({
+        where: {
+          cnpj: data.cnpj,
+          NOT: { id: params.id }
+        }
+      })
+
+      if (existingSupplier) {
+        return NextResponse.json(
+          { error: 'Já existe um fornecedor com este CNPJ' },
+          { status: 409 }
+        )
+      }
+    }
+
+    const updatedSupplier = await prisma.supplier.update({
+      where: { id: params.id },
+      data: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        cnpj: data.cnpj,
+        contact: data.contact
+      },
+      include: {
+        _count: {
+          select: { parts: true }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: updatedSupplier
+    })
+
+  } catch (error) {
+    console.error('Update supplier error:', error)
+    
+    if (error instanceof Error && error.message.includes('Record to update not found')) {
+      return NextResponse.json(
+        { error: 'Fornecedor não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }

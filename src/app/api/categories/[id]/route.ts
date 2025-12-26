@@ -2,6 +2,79 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromToken } from '@/lib/auth'
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const token = request.cookies.get('auth-token')?.value
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Token de autenticação necessário' },
+        { status: 401 }
+      )
+    }
+
+    const user = await getUserFromToken(token)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Token inválido' },
+        { status: 401 }
+      )
+    }
+
+    const data = await request.json()
+
+    // Verificar se já existe outra categoria com o mesmo nome
+    const existingCategory = await prisma.category.findFirst({
+      where: {
+        name: data.name,
+        NOT: { id: params.id }
+      }
+    })
+
+    if (existingCategory) {
+      return NextResponse.json(
+        { error: 'Já existe uma categoria com este nome' },
+        { status: 409 }
+      )
+    }
+
+    const updatedCategory = await prisma.category.update({
+      where: { id: params.id },
+      data: {
+        name: data.name,
+        description: data.description
+      },
+      include: {
+        _count: {
+          select: { parts: true }
+        }
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: updatedCategory
+    })
+
+  } catch (error) {
+    console.error('Update category error:', error)
+    
+    if (error instanceof Error && error.message.includes('Record to update not found')) {
+      return NextResponse.json(
+        { error: 'Categoria não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(
+      { error: 'Erro interno do servidor' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }

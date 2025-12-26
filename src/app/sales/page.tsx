@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { formatCurrency, formatDateTime, getStatusColor, getStatusText, getPaymentMethodText } from '@/lib/utils'
-import { Plus, Search, Eye, ShoppingCart, Trash2 } from 'lucide-react'
+import { Plus, Search, Eye, ShoppingCart, Trash2, Edit } from 'lucide-react'
 
 interface Sale {
   id: string
@@ -52,6 +52,7 @@ export default function SalesPage() {
   const [showModal, setShowModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
   const [viewingSale, setViewingSale] = useState<Sale | null>(null)
+  const [editingSale, setEditingSale] = useState<Sale | null>(null)
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -64,6 +65,7 @@ export default function SalesPage() {
     customerDocument: '',
     discount: '',
     paymentMethod: '',
+    status: '',
     notes: '',
     items: [] as Array<{
       partId: string
@@ -114,14 +116,17 @@ export default function SalesPage() {
     e.preventDefault()
     setFormErrors({})
 
-    if (formData.items.length === 0) {
+    if (!editingSale && formData.items.length === 0) {
       setFormErrors({ general: 'Adicione pelo menos um item à venda' })
       return
     }
 
     try {
-      const response = await fetch('/api/sales', {
-        method: 'POST',
+      const url = editingSale ? `/api/sales/${editingSale.id}` : '/api/sales'
+      const method = editingSale ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -132,10 +137,11 @@ export default function SalesPage() {
 
       if (response.ok) {
         setShowModal(false)
+        setEditingSale(null)
         resetForm()
         fetchData()
       } else {
-        setFormErrors({ general: data.error || 'Erro ao criar venda' })
+        setFormErrors({ general: data.error || `Erro ao ${editingSale ? 'atualizar' : 'criar'} venda` })
       }
     } catch (error) {
       setFormErrors({ general: 'Erro de conexão' })
@@ -195,6 +201,7 @@ export default function SalesPage() {
       customerDocument: '',
       discount: '',
       paymentMethod: '',
+      status: '',
       notes: '',
       items: []
     })
@@ -202,6 +209,7 @@ export default function SalesPage() {
     setSelectedPart('')
     setItemQuantity(1)
     setItemPrice('')
+    setEditingSale(null)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -214,6 +222,44 @@ export default function SalesPage() {
   const handleViewSale = (sale: Sale) => {
     setViewingSale(sale)
     setShowViewModal(true)
+  }
+
+  const handleEdit = (sale: Sale) => {
+    setEditingSale(sale)
+    setFormData({
+      customerName: sale.customerName || '',
+      customerEmail: sale.customerEmail || '',
+      customerPhone: sale.customerPhone || '',
+      customerDocument: '',
+      discount: '',
+      paymentMethod: sale.paymentMethod || '',
+      status: sale.status,
+      notes: '',
+      items: []
+    })
+    setShowModal(true)
+  }
+
+  const handleDelete = async (sale: Sale) => {
+    if (!confirm(`Tem certeza que deseja excluir a venda #${sale.saleNumber}?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/sales/${sale.id}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        fetchData()
+      } else {
+        alert(data.error || 'Erro ao excluir venda')
+      }
+    } catch (error) {
+      alert('Erro de conexão')
+    }
   }
 
   if (loading) {
@@ -333,13 +379,34 @@ export default function SalesPage() {
                       {formatDateTime(sale.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewSale(sale)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center justify-end space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewSale(sale)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        {(user?.role === 'ADMIN' || sale.status === 'PENDING') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(sale)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {user?.role === 'ADMIN' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(sale)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -348,14 +415,14 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* New Sale Modal */}
+        {/* New/Edit Sale Modal */}
         <Modal
           isOpen={showModal}
           onClose={() => {
             setShowModal(false)
             resetForm()
           }}
-          title="Nova Venda"
+          title={editingSale ? 'Editar Venda' : 'Nova Venda'}
           size="xl"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -392,8 +459,9 @@ export default function SalesPage() {
             </div>
 
             {/* Items */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Itens da Venda</h3>
+            {!editingSale && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Itens da Venda</h3>
               
               {/* Add Item */}
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
@@ -496,11 +564,12 @@ export default function SalesPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Payment Info */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Pagamento</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
                   label="Desconto"
                   name="discount"
@@ -516,6 +585,15 @@ export default function SalesPage() {
                   value={formData.paymentMethod}
                   onChange={handleChange}
                 />
+                {editingSale && (
+                  <Select
+                    label="Status"
+                    name="status"
+                    options={statusOptions}
+                    value={formData.status || editingSale.status}
+                    onChange={handleChange}
+                  />
+                )}
               </div>
               <div className="mt-4">
                 <Input
@@ -528,13 +606,15 @@ export default function SalesPage() {
             </div>
 
             {/* Total */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-right">
-                <p className="text-lg font-semibold text-gray-900">
-                  Total: {formatCurrency(calculateTotal())}
-                </p>
+            {!editingSale && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-gray-900">
+                    Total: {formatCurrency(calculateTotal())}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {formErrors.general && (
               <div className="text-red-600 text-sm">{formErrors.general}</div>
@@ -552,7 +632,7 @@ export default function SalesPage() {
                 Cancelar
               </Button>
               <Button type="submit">
-                Criar Venda
+                {editingSale ? 'Atualizar Venda' : 'Criar Venda'}
               </Button>
             </div>
           </form>
