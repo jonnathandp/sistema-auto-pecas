@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
             saleId: sale1.id,
             partId: parts[0].id,
             quantity: 2,
-            unitPrice: 25.90,
-            totalPrice: 51.80
+            price: 25.90,
+            total: 51.80
           }
         }),
         prisma.saleItem.create({
@@ -157,8 +157,8 @@ export async function POST(request: NextRequest) {
             saleId: sale1.id,
             partId: parts[3].id,
             quantity: 1,
-            unitPrice: 85.00,
-            totalPrice: 85.00
+            price: 85.00,
+            total: 85.00
           }
         })
       ]);
@@ -188,8 +188,8 @@ export async function POST(request: NextRequest) {
             saleId: sale2.id,
             partId: parts[2].id,
             quantity: 1,
-            unitPrice: 180.00,
-            totalPrice: 180.00
+            price: 180.00,
+            total: 180.00
           }
         }),
         prisma.saleItem.create({
@@ -197,8 +197,8 @@ export async function POST(request: NextRequest) {
             saleId: sale2.id,
             partId: parts[4].id,
             quantity: 1,
-            unitPrice: 280.00,
-            totalPrice: 280.00
+            price: 280.00,
+            total: 280.00
           }
         })
       ]);
