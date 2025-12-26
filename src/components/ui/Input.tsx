@@ -27,7 +27,7 @@ export const Input: React.FC<InputProps> = ({
       <input
         id={inputId}
         className={cn(
-          'input-field',
+          'input-field text-gray-900 bg-white',
           error && 'border-red-300 focus:ring-red-500',
           className
         )}

@@ -26,6 +26,28 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* Force text colors for better visibility */
+* {
+  color: inherit;
+}
+
+input, textarea, select {
+  color: #1f2937 !important; /* Force dark text in inputs */
+  background-color: white !important;
+}
+
+label {
+  color: #374151 !important; /* Force dark text in labels */
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #1f2937 !important; /* Force dark text in headings */
+}
+
+p, span, div {
+  color: inherit;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -55,7 +77,7 @@ body {
 }
 
 .input-field {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-gray-900;
 }
 
 .table-row {
