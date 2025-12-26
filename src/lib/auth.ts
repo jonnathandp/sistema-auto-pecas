@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { prisma } from './prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
 
@@ -25,13 +24,28 @@ export function verifyToken(token: string): { userId: string } | null {
 }
 
 export async function getUserFromToken(token: string) {
-  const decoded = verifyToken(token)
-  if (!decoded) return null
+  try {
+    const decoded = verifyToken(token)
+    if (!decoded) return null
 
-  const user = await prisma.user.findUnique({
-    where: { id: decoded.userId },
-    select: { id: true, email: true, name: true, role: true }
-  })
+    // Import dinâmico do Prisma para evitar problemas no build
+    const { PrismaClient } = await import('@prisma/client')
+    const prisma = new PrismaClient()
 
-  return user
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, email: true, name: true, role: true }
+      })
+
+      await prisma.$disconnect()
+      return user
+    } catch (dbError) {
+      await prisma.$disconnect()
+      throw dbError
+    }
+  } catch (error) {
+    console.error('Error getting user from token:', error)
+    return null
+  }
 }

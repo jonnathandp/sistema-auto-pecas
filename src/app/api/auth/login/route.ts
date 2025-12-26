@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Verificação para build time
-if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
-  console.log('Build time - skipping database operations')
-}
+import { prisma } from '@/lib/prisma'
+import { verifyPassword, generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    // Importação dinâmica para evitar erros durante build
-    const { prisma } = await import('@/lib/prisma')
-    const { verifyPassword, generateToken } = await import('@/lib/auth')
-    
     const { email, password } = await request.json()
 
     if (!email || !password) {
@@ -71,9 +64,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// Função para build time
-export async function GET() {
-  return NextResponse.json({ message: 'Login endpoint' })
 }
