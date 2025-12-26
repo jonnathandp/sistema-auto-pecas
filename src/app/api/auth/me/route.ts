@@ -4,9 +4,12 @@ import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
-import bcrypt from 'bcryptjs'
 
-// Mesma configuração do NextAuth para manter consistência
+// Força renderização dinâmica
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+// Configuração idêntica ao NextAuth para consistência
 const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -16,15 +19,16 @@ const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
+        if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+          return null
+        }
+
         if (!credentials?.email || !credentials?.password) {
           return null
         }
 
-        if (!process.env.DATABASE_URL) {
-          return null
-        }
-
         try {
+          const bcrypt = await import('bcryptjs')
           const { PrismaClient } = await import('@prisma/client')
           const prisma = new PrismaClient()
           
@@ -60,14 +64,14 @@ const authOptions: NextAuthOptions = {
         }
       }
     }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID || '',
-      clientSecret: process.env.GITHUB_SECRET || '',
-    }),
+    ...(process.env.GOOGLE_CLIENT_ID ? [GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    })] : []),
+    ...(process.env.GITHUB_ID ? [GitHubProvider({
+      clientId: process.env.GITHUB_ID,
+      clientSecret: process.env.GITHUB_SECRET!,
+    })] : []),
   ],
   session: {
     strategy: 'jwt',
@@ -84,8 +88,8 @@ const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub!
+      if (session.user && token.sub) {
+        session.user.id = token.sub
         session.user.role = token.role as string
       }
       return session
@@ -95,8 +99,8 @@ const authOptions: NextAuthOptions = {
 
 export async function GET(request: NextRequest) {
   try {
-    // Durante o build, retornar uma resposta vazia para evitar erro
-    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    // Durante o build, retornar uma resposta segura
+    if (process.env.VERCEL_ENV === 'build') {
       return NextResponse.json({
         error: 'Service unavailable during build'
       }, { status: 503 })

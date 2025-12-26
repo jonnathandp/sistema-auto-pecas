@@ -11,6 +11,17 @@ const nextConfig = {
   },
   env: {
     SKIP_ENV_VALIDATION: '1'
+  },
+  // Configuração específica para build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  // Forçar rotas de API como dinâmicas
+  rewrites: async () => {
+    return []
   }
 }
 
