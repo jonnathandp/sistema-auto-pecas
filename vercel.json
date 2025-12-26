@@ -1,12 +1,19 @@
 {
   "build": {
     "env": {
-      "PRISMA_GENERATE_DATAPROXY": "true"
+      "PRISMA_GENERATE_DATAPROXY": "true",
+      "SKIP_ENV_VALIDATION": "1"
     }
   },
   "functions": {
-    "app/api/**/*.ts": {
+    "src/app/api/**/*.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/src/app/api/:path*"
+    }
+  ]
 }

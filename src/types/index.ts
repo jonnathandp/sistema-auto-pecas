@@ -1,4 +1,26 @@
 import { Prisma } from '@prisma/client'
+import { DefaultSession, DefaultUser } from 'next-auth'
+import { JWT } from 'next-auth/jwt'
+
+// NextAuth types extension
+declare module 'next-auth' {
+  interface Session extends DefaultSession {
+    user: {
+      id: string
+      role: string
+    } & DefaultSession['user']
+  }
+
+  interface User extends DefaultUser {
+    role: string
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    role: string
+  }
+}
 
 // User types
 export type User = Prisma.UserGetPayload<{}>
