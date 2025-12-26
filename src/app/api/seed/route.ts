@@ -1,6 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export async function GET(request: NextRequest) {
+  try {
+    // Verificação de segurança
+    const { searchParams } = new URL(request.url);
+    const secret = searchParams.get('secret');
+    
+    if (secret !== 'seed-database-2024') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Importar dependências dinamicamente
+    const { PrismaClient } = await import('@prisma/client');
+    const bcrypt = await import('bcryptjs');
+    
+    const prisma = new PrismaClient();
+
+    // Criar dados básicos de teste
+    
+    // 1. Categorias
+    const categoriesData = [
+      { name: 'Motor', description: 'Peças relacionadas ao motor' },
+      { name: 'Freios', description: 'Sistema de freios' },
+      { name: 'Suspensão', description: 'Componentes de suspensão' },
+      { name: 'Elétrica', description: 'Componentes elétricos' }
+    ];
+
+    const categories = [];
+    for (const cat of categoriesData) {
+      const existing = await prisma.category.findUnique({ where: { name: cat.name } });
+      if (!existing) {
+        const created = await prisma.category.create({ data: cat });
+        categories.push(created);
+      }
+    }
+
+    // 2. Fornecedores
+    const suppliersData = [
+      {
+        name: 'AutoPeças Brasil',
+        email: 'vendas@autopecasbrasil.com',
+        phone: '(11) 3456-7890',
+        cnpj: '12.345.678/0001-90'
+      },
+      {
+        name: 'Distribuidora Nacional',
+        email: 'comercial@dist.com',
+        phone: '(21) 2345-6789',
+        cnpj: '23.456.789/0001-01'
+      }
+    ];
+
+    const suppliers = [];
+    for (const sup of suppliersData) {
+      const existing = await prisma.supplier.findFirst({ where: { name: sup.name } });
+      if (!existing) {
+        const created = await prisma.supplier.create({ data: sup });
+        suppliers.push(created);
+      }
+    }
+
+    // 3. Usuário vendedor
+    const hashedPassword = await bcrypt.hash('123456', 10);
+    const existingUser = await prisma.user.findUnique({ where: { email: 'vendedor@autopecas.com' } });
+    if (!existingUser) {
+      await prisma.user.create({
+        data: {
+          email: 'vendedor@autopecas.com',
+          name: 'José Vendedor',
+          password: hashedPassword,
+          role: 'USER'
+        }
+      });
+    }
+
+    await prisma.$disconnect();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Dados básicos criados!',
+      data: {
+        categories: categories.length,
+        suppliers: suppliers.length,
+        users: 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Seed error:', error);
+    return NextResponse.json({
+      error: 'Erro ao criar dados',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
+  return GET(request);
+}
   try {
     // Verificação de segurança
     const { searchParams } = new URL(request.url);
