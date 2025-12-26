@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
+import { isBuildTime } from '@/lib/build-utils'
 
 // Força renderização dinâmica
 export const dynamic = 'force-dynamic'
@@ -18,8 +19,8 @@ const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        // Durante build, retornar null para evitar conexões
-        if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+        // Verificação robusta de build time
+        if (isBuildTime()) {
           return null
         }
 

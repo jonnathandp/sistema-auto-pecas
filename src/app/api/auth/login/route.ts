@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyPassword, generateToken } from '@/lib/auth'
 
 // Força renderização dinâmica
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function POST(request: NextRequest) {
-  try {
-    // Durante o build, retornar erro de serviço indisponível
-    if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
-      return NextResponse.json({
-        error: 'Service unavailable during build'
-      }, { status: 503 })
-    }
+  // Durante build, sempre retornar erro de serviço indisponível
+  if (!process.env.DATABASE_URL || 
+      process.env.VERCEL_ENV === 'build' ||
+      process.env.NODE_ENV !== 'production' && !process.env.DATABASE_URL) {
+    return NextResponse.json({
+      error: 'Service unavailable during build'
+    }, { status: 503 })
+  }
 
+  try {
+    const { verifyPassword, generateToken } = await import('@/lib/auth')
     const { email, password } = await request.json()
 
     if (!email || !password) {

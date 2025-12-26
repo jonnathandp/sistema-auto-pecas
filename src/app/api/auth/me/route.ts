@@ -4,6 +4,7 @@ import GoogleProvider from 'next-auth/providers/google'
 import GitHubProvider from 'next-auth/providers/github'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
+import { isBuildTime } from '@/lib/build-utils'
 
 // Força renderização dinâmica
 export const dynamic = 'force-dynamic'
@@ -99,8 +100,8 @@ const authOptions: NextAuthOptions = {
 
 export async function GET(request: NextRequest) {
   try {
-    // Durante o build, retornar uma resposta segura
-    if (process.env.VERCEL_ENV === 'build') {
+    // Verificação robusta de build time
+    if (isBuildTime()) {
       return NextResponse.json({
         error: 'Service unavailable during build'
       }, { status: 503 })

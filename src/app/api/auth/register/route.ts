@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hashPassword, generateToken } from '@/lib/auth'
+import { isBuildTime } from '@/lib/build-utils'
 
 // Força renderização dinâmica
 export const dynamic = 'force-dynamic'
@@ -7,8 +8,8 @@ export const revalidate = 0
 
 export async function POST(request: NextRequest) {
   try {
-    // Durante o build, retornar erro de serviço indisponível
-    if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+    // Verificação robusta de build time
+    if (isBuildTime()) {
       return NextResponse.json({
         error: 'Service unavailable during build'
       }, { status: 503 })
