@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { hashPassword, generateToken } from '@/lib/auth'
+
+// Força renderização dinâmica
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function POST(request: NextRequest) {
   try {
+    // Durante o build, retornar erro de serviço indisponível
+    if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+      return NextResponse.json({
+        error: 'Service unavailable during build'
+      }, { status: 503 })
+    }
+
     const { email, password, name } = await request.json()
 
     if (!email || !password || !name) {
@@ -20,52 +30,65 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    // Import dinâmico do Prisma
+    const { PrismaClient } = await import('@prisma/client')
+    const prisma = new PrismaClient()
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Email já está em uso' },
-        { status: 409 }
-      )
+    try {
+      const existingUser = await prisma.user.findUnique({
+        where: { email }
+      })
+
+      if (existingUser) {
+        await prisma.$disconnect()
+        return NextResponse.json(
+          { error: 'Email já está em uso' },
+          { status: 409 }
+        )
+      }
+
+      const hashedPassword = await hashPassword(password)
+
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          role: 'USER'
+        }
+      })
+
+      await prisma.$disconnect()
+
+      const token = generateToken(user.id)
+
+      const response = NextResponse.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+          },
+          token
+        }
+      })
+
+      // Set HTTP-only cookie
+      response.cookies.set('auth-token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      })
+
+      return response
+    } catch (dbError) {
+      await prisma.$disconnect()
+      throw dbError
     }
 
-    const hashedPassword = await hashPassword(password)
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role: 'USER'
-      }
-    })
-
-    const token = generateToken(user.id)
-
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        },
-        token
-      }
-    })
-
-    // Set HTTP-only cookie
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
-
-    return response
   } catch (error) {
     console.error('Register error:', error)
     return NextResponse.json(

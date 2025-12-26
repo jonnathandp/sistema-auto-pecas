@@ -1,10 +1,30 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+
+// Força renderização dinâmica
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET() {
   try {
-    // Get basic stats
-    const [totalParts, totalSales, totalRevenue, lowStockParts] = await Promise.all([
+    // Durante o build, retornar dados mock
+    if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+      return NextResponse.json({
+        totalParts: 0,
+        totalSales: 0,
+        totalRevenue: 0,
+        lowStockParts: [],
+        recentSales: [],
+        monthlyRevenue: []
+      })
+    }
+
+    // Import dinâmico do Prisma
+    const { PrismaClient } = await import('@prisma/client')
+    const prisma = new PrismaClient()
+
+    try {
+      // Get basic stats
+      const [totalParts, totalSales, totalRevenue, lowStockParts] = await Promise.all([
       prisma.part.count({ where: { isActive: true } }),
       prisma.sale.count(),
       prisma.sale.aggregate({
@@ -100,24 +120,31 @@ export async function GET() {
       return acc
     }, {})
 
-    const salesByMonthFormatted = Object.entries(monthlyData).map(([month, data]: [string, any]) => ({
-      month,
-      sales: data.sales,
-      revenue: data.revenue
-    }))
+      const salesByMonthFormatted = Object.entries(monthlyData).map(([month, data]: [string, any]) => ({
+        month,
+        sales: data.sales,
+        revenue: data.revenue
+      }))
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalParts,
-        totalSales,
-        totalRevenue: Number(totalRevenue._sum.total || 0),
-        lowStockParts,
-        recentSales,
-        topSellingParts: topSellingPartsWithDetails,
-        salesByMonth: salesByMonthFormatted
-      }
-    })
+      await prisma.$disconnect()
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          totalParts,
+          totalSales,
+          totalRevenue: Number(totalRevenue._sum.total || 0),
+          lowStockParts,
+          recentSales,
+          topSellingParts: topSellingPartsWithDetails,
+          salesByMonth: salesByMonthFormatted
+        }
+      })
+    } catch (dbError) {
+      await prisma.$disconnect()
+      throw dbError
+    }
+
   } catch (error) {
     console.error('Dashboard error:', error)
     return NextResponse.json(

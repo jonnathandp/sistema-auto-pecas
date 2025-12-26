@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { verifyPassword, generateToken } from '@/lib/auth'
+
+// Força renderização dinâmica
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function POST(request: NextRequest) {
   try {
+    // Durante o build, retornar erro de serviço indisponível
+    if (process.env.VERCEL_ENV === 'build' || !process.env.DATABASE_URL) {
+      return NextResponse.json({
+        error: 'Service unavailable during build'
+      }, { status: 503 })
+    }
+
     const { email, password } = await request.json()
 
     if (!email || !password) {
@@ -13,50 +23,64 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
+    // Import dinâmico do Prisma
+    const { PrismaClient } = await import('@prisma/client')
+    const prisma = new PrismaClient()
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Credenciais inválidas' },
-        { status: 401 }
-      )
-    }
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email }
+      })
 
-    const isValidPassword = await verifyPassword(password, user.password)
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Credenciais inválidas' },
-        { status: 401 }
-      )
-    }
-
-    const token = generateToken(user.id)
-
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        },
-        token
+      if (!user) {
+        await prisma.$disconnect()
+        return NextResponse.json(
+          { error: 'Credenciais inválidas' },
+          { status: 401 }
+        )
       }
-    })
 
-    // Set HTTP-only cookie
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
+      const isValidPassword = await verifyPassword(password, user.password)
 
-    return response
+      if (!isValidPassword) {
+        await prisma.$disconnect()
+        return NextResponse.json(
+          { error: 'Credenciais inválidas' },
+          { status: 401 }
+        )
+      }
+
+      await prisma.$disconnect()
+
+      const token = generateToken(user.id)
+
+      const response = NextResponse.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+          },
+          token
+        }
+      })
+
+      // Set HTTP-only cookie
+      response.cookies.set('auth-token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      })
+
+      return response
+    } catch (dbError) {
+      await prisma.$disconnect()
+      throw dbError
+    }
+
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
