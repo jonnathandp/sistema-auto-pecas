@@ -61,6 +61,15 @@ export async function PUT(
     }
 
     const data = await request.json()
+    console.log('Dados recebidos para atualização:', data)
+
+    // Basic validation
+    if (!data.name || !data.price) {
+      return NextResponse.json(
+        { error: 'Nome e preço são obrigatórios' },
+        { status: 400 }
+      )
+    }
 
     // Check if code already exists (excluding current part)
     if (data.code) {
@@ -91,13 +100,19 @@ export async function PUT(
       )
     }
 
+    // Remove code from data to prevent unique constraint issues
+    const { code, ...updateData } = data
+
     const part = await prisma.part.update({
       where: { id: params.id },
       data: {
-        ...data,
-        price: parseFloat(data.price),
-        costPrice: data.costPrice ? parseFloat(data.costPrice) : null,
-        weight: data.weight ? parseFloat(data.weight) : null
+        ...updateData,
+        price: parseFloat(updateData.price),
+        costPrice: updateData.costPrice ? parseFloat(updateData.costPrice) : null,
+        stock: updateData.stock ? parseInt(updateData.stock) : undefined,
+        minStock: updateData.minStock ? parseInt(updateData.minStock) : undefined,
+        weight: updateData.weight ? parseFloat(updateData.weight) : null,
+        warranty: updateData.warranty ? parseInt(updateData.warranty) : null
       },
       include: {
         category: true,
@@ -106,16 +121,19 @@ export async function PUT(
     })
 
     // Create stock movement if stock changed
-    if (data.stock !== undefined && data.stock !== currentPart.stock) {
-      const difference = data.stock - currentPart.stock
-      await prisma.stockMovement.create({
-        data: {
-          partId: part.id,
-          type: difference > 0 ? 'IN' : 'OUT',
-          quantity: Math.abs(difference),
-          reason: 'Ajuste manual de estoque'
-        }
-      })
+    if (updateData.stock !== undefined) {
+      const newStock = parseInt(updateData.stock)
+      if (newStock !== currentPart.stock) {
+        const difference = newStock - currentPart.stock
+        await prisma.stockMovement.create({
+          data: {
+            partId: part.id,
+            type: difference > 0 ? 'IN' : 'OUT',
+            quantity: Math.abs(difference),
+            reason: 'Ajuste manual de estoque'
+          }
+        })
+      }
     }
 
     return NextResponse.json({
@@ -124,6 +142,24 @@ export async function PUT(
     })
   } catch (error) {
     console.error('Update part error:', error)
+    
+    // Handle Prisma specific errors
+    if (error instanceof Error) {
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: 'Erro de referência: categoria ou fornecedor inválido' },
+          { status: 400 }
+        )
+      }
+      
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: 'Código da peça já existe' },
+          { status: 409 }
+        )
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

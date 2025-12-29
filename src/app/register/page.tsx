@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Eye, EyeOff, Settings, User, Lock, Mail, UserPlus, Wrench, Car } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -15,6 +16,8 @@ export default function RegisterPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

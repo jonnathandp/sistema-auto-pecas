@@ -13,13 +13,23 @@ interface Part {
   id: string
   code: string
   name: string
+  description?: string
   brand?: string
   model?: string
+  year?: string
   price: number
+  costPrice?: number
   stock: number
   minStock: number
-  category: { name: string }
-  supplier?: { name: string }
+  location?: string
+  barcode?: string
+  weight?: number
+  dimensions?: string
+  warranty?: number
+  categoryId: string
+  category: { id: string; name: string }
+  supplierId?: string
+  supplier?: { id: string; name: string }
   isActive: boolean
   createdAt: string
 }
@@ -112,18 +122,30 @@ export default function PartsPage() {
     setFormErrors({})
 
     try {
+      // Clean empty string fields
+      const cleanData = { ...formData }
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key as keyof typeof cleanData] === '') {
+          delete cleanData[key as keyof typeof cleanData]
+        }
+      })
+
       const url = editingPart ? `/api/parts/${editingPart.id}` : '/api/parts'
       const method = editingPart ? 'PUT' : 'POST'
+
+      console.log('Enviando dados:', cleanData) // Debug log
+      console.log('URL:', url, 'Method:', method) // Debug log
 
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanData)
       })
 
       const data = await response.json()
+      console.log('Resposta da API:', data) // Debug log
 
       if (response.ok) {
         setShowModal(false)
@@ -139,24 +161,25 @@ export default function PartsPage() {
   }
 
   const handleEdit = (part: Part) => {
+    console.log('Editando peça:', part) // Debug log
     setEditingPart(part)
     setFormData({
-      name: part.name,
-      description: '',
+      name: part.name || '',
+      description: part.description || '',
       brand: part.brand || '',
       model: part.model || '',
-      year: '',
+      year: part.year || '',
       price: part.price.toString(),
-      costPrice: '',
+      costPrice: part.costPrice?.toString() || '',
       stock: part.stock.toString(),
       minStock: part.minStock.toString(),
-      location: '',
-      barcode: '',
-      weight: '',
-      dimensions: '',
-      warranty: '',
-      categoryId: part.category ? '' : '',
-      supplierId: part.supplier ? '' : ''
+      location: part.location || '',
+      barcode: part.barcode || '',
+      weight: part.weight?.toString() || '',
+      dimensions: part.dimensions || '',
+      warranty: part.warranty?.toString() || '',
+      categoryId: part.categoryId || '',
+      supplierId: part.supplierId || ''
     })
     setShowModal(true)
   }
